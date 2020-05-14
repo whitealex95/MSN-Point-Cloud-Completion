@@ -31,11 +31,13 @@ if opt.model != '':
     print("Previous weight loaded ")
 
 network.eval()
-with open(os.path.join('./data/val.list')) as file:
-    model_list = [line.strip().replace('/', '_') for line in file]
+list_path = './data/pcn_shapenet/val.txt'
+data_root = './data/pcn_shapenet/val'
 
-partial_dir = "./data/val/"
-gt_dir = "./data/complete/" 
+with open(list_path, 'r') as f:
+    # list of voxel data files in voxel
+    model_list = [line[:-1] for line in f]  # remove '\n'
+
 vis = visdom.Visdom(port = 8097, env=opt.env) # set your port
 
 def resample_pcd(pcd, n):
@@ -54,20 +56,6 @@ labels_generated_points = labels_generated_points.contiguous().view(-1)
 with torch.no_grad():
     for i, model in enumerate(model_list):
         print(model)
-        # partial = torch.zeros((50, 5000, 3), device='cuda')
-        # gt = torch.zeros((50, opt.num_points, 3), device='cuda')
-        # # Load input pointcloud, saved divided by 50
-        # for j in range(50):
-        #     pcd = o3d.io.read_point_cloud(os.path.join(partial_dir, model + '_' + str(j) + '_denoised.pcd'))
-        #     partial[j, :, :] = torch.from_numpy(resample_pcd(np.array(pcd.points), 5000))
-        #     pcd = o3d.io.read_point_cloud(os.path.join(gt_dir, model + '.pcd'))
-        #     gt[j, :, :] = torch.from_numpy(resample_pcd(np.array(pcd.points), opt.num_points))
-
-        list_path = './data/pcn_shapenet/val.txt'
-        data_root = './data/pcn_shapenet/val'
-        with open(list_path, 'r') as f:
-            # list of voxel data files in voxel
-            model_list = [line[:-1] for line in f]  # remove '\n'
         data_path = os.path.join(data_root, model_list[i])
         input_path = data_path + '_input.pt'
         gt_path = data_path +'_gt.pt'
