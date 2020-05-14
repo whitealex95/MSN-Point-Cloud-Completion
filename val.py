@@ -54,20 +54,36 @@ labels_generated_points = labels_generated_points.contiguous().view(-1)
 with torch.no_grad():
     for i, model in enumerate(model_list):
         print(model)
-        partial = torch.zeros((50, 5000, 3), device='cuda')
-        gt = torch.zeros((50, opt.num_points, 3), device='cuda')
-        for j in range(50):
-            pcd = o3d.io.read_point_cloud(os.path.join(partial_dir, model + '_' + str(j) + '_denoised.pcd'))
-            partial[j, :, :] = torch.from_numpy(resample_pcd(np.array(pcd.points), 5000))
-            pcd = o3d.io.read_point_cloud(os.path.join(gt_dir, model + '.pcd'))
-            gt[j, :, :] = torch.from_numpy(resample_pcd(np.array(pcd.points), opt.num_points))
+        # partial = torch.zeros((50, 5000, 3), device='cuda')
+        # gt = torch.zeros((50, opt.num_points, 3), device='cuda')
+        # # Load input pointcloud, saved divided by 50
+        # for j in range(50):
+        #     pcd = o3d.io.read_point_cloud(os.path.join(partial_dir, model + '_' + str(j) + '_denoised.pcd'))
+        #     partial[j, :, :] = torch.from_numpy(resample_pcd(np.array(pcd.points), 5000))
+        #     pcd = o3d.io.read_point_cloud(os.path.join(gt_dir, model + '.pcd'))
+        #     gt[j, :, :] = torch.from_numpy(resample_pcd(np.array(pcd.points), opt.num_points))
 
+        list_path = './data/pcn_shapenet/val.txt'
+        data_root = './data/pcn_shapenet/val'
+        with open(list_path, 'r') as f:
+            # list of voxel data files in voxel
+            model_list = [line[:-1] for line in f]  # remove '\n'
+        data_path = os.path.join(data_root, model_list[i])
+        input_path = data_path + '_input.pt'
+        gt_path = data_path +'_gt.pt'
+        x_coord = torch.load(input_path)
+        y_coord = torch.load(gt_path)
+        partial = torch.from_numpy(resample_pcd(np.array(x_coord), 5000)).unsqueeze(0).cuda()
+        gt = torch.from_numpy(resample_pcd(np.array(y_coord), opt.num_points)).unsqueeze(0).cuda()
+
+        # __import__('pdb').set_trace()
         output1, output2, expansion_penalty = network(partial.transpose(2,1).contiguous())
         dist, _ = EMD(output1, gt, 0.002, 10000)
         emd1 = torch.sqrt(dist).mean()
         dist, _ = EMD(output2, gt, 0.002, 10000)
         emd2 = torch.sqrt(dist).mean()
-        idx = random.randint(0, 49)
+        # idx = random.randint(0, 49)
+        idx = 0
         vis.scatter(X = gt[idx].data.cpu(), win = 'GT',
                     opts = dict(title = model, markersize = 2))
         vis.scatter(X = partial[idx].data.cpu(), win = 'INPUT',
@@ -80,3 +96,48 @@ with torch.no_grad():
                     win = 'OUTPUT',
                     opts = dict(title = model, markersize=2))
         print(opt.env + ' val [%d/%d]  emd1: %f emd2: %f expansion_penalty: %f' %(i + 1, len(model_list), emd1.item(), emd2.item(), expansion_penalty.mean().item()))
+
+# with torch.no_grad():
+#     for i, model in enumerate(model_list):
+#         print(model)
+#         partial = torch.zeros((50, 5000, 3), device='cuda')
+#         gt = torch.zeros((50, opt.num_points, 3), device='cuda')
+#         # Load input pointcloud, saved divided by 50
+#         for j in range(50):
+#             pcd = o3d.io.read_point_cloud(os.path.join(partial_dir, model + '_' + str(j) + '_denoised.pcd'))
+#             partial[j, :, :] = torch.from_numpy(resample_pcd(np.array(pcd.points), 5000))
+#             pcd = o3d.io.read_point_cloud(os.path.join(gt_dir, model + '.pcd'))
+#             gt[j, :, :] = torch.from_numpy(resample_pcd(np.array(pcd.points), opt.num_points))
+
+#         list_path = './data/pcn_shapenet/val.txt'
+#         data_root = './data/pcn_shapenet/val'
+#         with open(list_path, 'r') as f:
+#             # list of voxel data files in voxel
+#             model_list = [line[:-1] for line in f]  # remove '\n'
+#         data_path = os.path.join(data_root, model_list[i])
+#         input_path = data_path + '_input.pt'
+#         gt_path = data_path +'_gt.pt'
+#         x_coord = torch.load(input_path)
+#         y_coord = torch.load(gt_path)
+#         partial_tmp = torch.from_numpy(resample_pcd(np.array(x_coord), 5000))
+#         gt_tmp = torch.from_numpy(resample_pcd(np.array(y_coord), opt.num_points))
+
+#         __import__('pdb').set_trace()
+#         output1, output2, expansion_penalty = network(partial.transpose(2,1).contiguous())
+#         dist, _ = EMD(output1, gt, 0.002, 10000)
+#         emd1 = torch.sqrt(dist).mean()
+#         dist, _ = EMD(output2, gt, 0.002, 10000)
+#         emd2 = torch.sqrt(dist).mean()
+#         idx = random.randint(0, 49)
+#         vis.scatter(X = gt[idx].data.cpu(), win = 'GT',
+#                     opts = dict(title = model, markersize = 2))
+#         vis.scatter(X = partial[idx].data.cpu(), win = 'INPUT',
+#                     opts = dict(title = model, markersize = 2))
+#         vis.scatter(X = output1[idx].data.cpu(),
+#                     Y = labels_generated_points[0:output1.size(1)],
+#                     win = 'COARSE',
+#                     opts = dict(title = model, markersize=2))
+#         vis.scatter(X = output2[idx].data.cpu(),
+#                     win = 'OUTPUT',
+#                     opts = dict(title = model, markersize=2))
+#         print(opt.env + ' val [%d/%d]  emd1: %f emd2: %f expansion_penalty: %f' %(i + 1, len(model_list), emd1.item(), emd2.item(), expansion_penalty.mean().item()))
